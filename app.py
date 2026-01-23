@@ -51,39 +51,29 @@ def prune(type):
     if 'user' not in session: return redirect(url_for('login'))
     
     reclaimed_info = "0"
-    # THE SHIELD: Only this domain survives
     protected_domain = 'university'
-    my_project_keyword = "dockercleanerpro"
+    
+    # Updated Self-Preservation List: Shielding the entire infrastructure
+    # This prevents the app from deleting its own UI, DB, or CI/CD engine
+    my_project_keywords = ["dockercleanerpro", "mongodb", "jenkins-automation"]
 
     if type == 'containers':
         all_containers = docker_client.containers.list(all=True)
         count = 0
         for container in all_containers:
-            # 1. SKIP your project and anything labeled 'university'
-            if my_project_keyword in container.name.lower() or \
-               container.labels.get('domain') == protected_domain:
+            # 1. SHIELD CHECK: Skip project infra AND anything labeled 'university'
+            # This fulfills the "University Shield" and "Self-Preservation" requirements
+            is_protected_infra = any(kw in container.name.lower() for kw in my_project_keywords)
+            is_university_shielded = container.labels.get('domain') == protected_domain
+
+            if is_protected_infra or is_university_shielded:
                 continue
             
-            # 2. DELETE only if stopped (Exited)
-            if container.status == 'exited' or container.status == 'created':
+            # 2. DELETE only if stopped (Exited or Created but not running)
+            if container.status in ['exited', 'created']:
                 container.remove(force=True)
                 count += 1
         reclaimed_info = f"{count} containers"
-
-    elif type == 'images':
-        # Prunes all unused images (not just dangling)
-        res = docker_client.images.prune(filters={'dangling': False})
-        reclaimed_info = f"{res.get('SpaceReclaimed', 0) / (1024*1024):.2f} MB"
-
-    # Log to MongoDB
-    history_col.insert_one({
-        "action": f"Selective {type.capitalize()} Cleanup",
-        "reclaimed": reclaimed_info,
-        "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        "user": session['user']
-    })
-    
-    return redirect(url_for('index'))
 
 @app.route('/logout')
 def logout():
