@@ -4,13 +4,14 @@ pipeline {
         stage('Step 1: Environment Check') {
             steps {
                 echo 'Verifying Docker Access...'
-                sh 'docker version' // Confirms Jenkins can talk to the Docker socket
+                sh 'docker version' 
             }
         }
         stage('Step 2: Rebuild Docker Cleaner') {
             steps {
                 echo 'Syncing project with latest GitHub code...'
-                sh 'docker-compose up -d --build app' // This updates your Flask UI automatically
+                // Changed 'docker-compose' to 'docker compose'
+                sh 'docker compose up -d --build app' 
             }
         }
     }
