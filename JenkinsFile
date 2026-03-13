@@ -4,14 +4,14 @@ pipeline {
         stage('Step 1: Environment Check') {
             steps {
                 echo 'Verifying Docker Access...'
-                sh 'docker version' 
+                sh 'docker version'
             }
         }
-        stage('Step 2: Rebuild Docker Cleaner') {
+
+        stage('Step 2: Build Without Cleanup') {
             steps {
-                echo 'Syncing project with latest GitHub code...'
-                // Changed 'docker-compose' to 'docker compose'
-                sh 'docker compose up -d --build app' 
+                echo 'Running docker compose without cleanup to allow conflicts...'
+                sh 'docker compose up -d --build'
             }
         }
     }
