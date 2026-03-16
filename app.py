@@ -1,5 +1,5 @@
 import docker
-from flask import Flask, render_template, redirect, url_for, request, session
+from flask import Flask, render_template, redirect, url_for, request, session, flash
 from pymongo import MongoClient
 from datetime import datetime
 
@@ -17,19 +17,14 @@ except:
 # Connect to Docker
 docker_client = docker.from_env()
 
-from flask import flash # Add this import at the top
-
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
-        # Check credentials
         if request.form['username'] == 'admin' and request.form['password'] == 'password':
             session['user'] = 'admin'
             return redirect(url_for('index'))
         else:
-            # Send message to the UI
             flash("Invalid username or password. Please try again.") 
-            
     return render_template('login.html')
 
 @app.route('/')
@@ -37,21 +32,21 @@ def index():
     if 'user' not in session:
         return redirect(url_for('login'))
     
-    # Modules 1-4: Fetching Data
-    containers = docker_client.containers.list(all=True)
-    images = docker_client.images.list()
-    volumes = docker_client.volumes.list()
-    networks = docker_client.networks.list()
-    
-    # Module 5: Fetch History from MongoDB
-    logs = list(history_col.find().sort("timestamp", -1))
-    
-    return render_template('index.html', 
-                           containers=containers, 
-                           images=images, 
-                           volumes=volumes, 
-                           networks=networks,
-                           logs=logs)
+    try:
+        containers = docker_client.containers.list(all=True)
+        images = docker_client.images.list()
+        volumes = docker_client.volumes.list()
+        networks = docker_client.networks.list()
+        logs = list(history_col.find().sort("timestamp", -1))
+        
+        return render_template('index.html', 
+                               containers=containers, 
+                               images=images, 
+                               volumes=volumes, 
+                               networks=networks,
+                               logs=logs)
+    except Exception as e:
+        return f"Error connecting to Docker/Mongo: {e}"
 
 @app.route('/prune/<type>')
 def prune(type):
@@ -59,28 +54,48 @@ def prune(type):
     
     reclaimed_info = "0"
     protected_domain = 'university'
-    
-    # Updated Self-Preservation List: Shielding the entire infrastructure
-    # This prevents the app from deleting its own UI, DB, or CI/CD engine
     my_project_keywords = ["dockercleanerpro", "mongodb", "jenkins-automation"]
 
-    if type == 'containers':
-        all_containers = docker_client.containers.list(all=True)
-        count = 0
-        for container in all_containers:
-            # 1. SHIELD CHECK: Skip project infra AND anything labeled 'university'
-            # This fulfills the "University Shield" and "Self-Preservation" requirements
-            is_protected_infra = any(kw in container.name.lower() for kw in my_project_keywords)
-            is_university_shielded = container.labels.get('domain') == protected_domain
+    try:
+        if type == 'containers':
+            all_containers = docker_client.containers.list(all=True)
+            count = 0
+            for container in all_containers:
+                is_protected_infra = any(kw in container.name.lower() for kw in my_project_keywords)
+                is_university_shielded = container.labels.get('domain') == protected_domain
+                
+                if is_protected_infra or is_university_shielded:
+                    continue
+                
+                if container.status in ['exited', 'created']:
+                    container.remove(force=True)
+                    count += 1
+            reclaimed_info = f"{count} containers"
 
-            if is_protected_infra or is_university_shielded:
-                continue
-            
-            # 2. DELETE only if stopped (Exited or Created but not running)
-            if container.status in ['exited', 'created']:
-                container.remove(force=True)
-                count += 1
-        reclaimed_info = f"{count} containers"
+        elif type == 'images':
+            # Safely prune only dangling (unused) images
+            res = docker_client.images.prune(filters={'dangling': True})
+            reclaimed = res.get('SpaceReclaimed', 0)
+            reclaimed_info = f"{reclaimed / (1024*1024):.2f} MB"
+
+        elif type == 'volumes':
+            res = docker_client.volumes.prune()
+            reclaimed_info = "Volumes cleaned"
+
+        # Log the action to MongoDB
+        history_col.insert_one({
+            "action": f"Selective {type.capitalize()} Cleanup",
+            "reclaimed": reclaimed_info,
+            "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "user": session['user']
+        })
+        flash(f"Cleanup Successful: {reclaimed_info}")
+
+    except Exception as e:
+        flash(f"Error during {type} prune: {e}")
+
+    # CRITICAL: This return was missing, causing the 500 error!
+    return redirect(url_for('index'))
 
 @app.route('/logout')
 def logout():
