@@ -17,12 +17,19 @@ except:
 # Connect to Docker
 docker_client = docker.from_env()
 
+from flask import flash # Add this import at the top
+
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
+        # Check credentials
         if request.form['username'] == 'admin' and request.form['password'] == 'password':
             session['user'] = 'admin'
             return redirect(url_for('index'))
+        else:
+            # Send message to the UI
+            flash("Invalid username or password. Please try again.") 
+            
     return render_template('login.html')
 
 @app.route('/')
