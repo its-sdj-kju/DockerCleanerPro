@@ -8,6 +8,7 @@ services:
       - "5000:5000"
     volumes:
       - .:/app
+      - .:/app
       - /var/run/docker.sock:/var/run/docker.sock
     depends_on:
       - mongodb
@@ -26,12 +27,19 @@ services:
     image: jenkins/jenkins:lts
     container_name: jenkins-automation
     user: root
+    privileged: true
     ports:
       - "8080:8080"
       - "50000:50000"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - jenkins-data:/var/jenkins_home
+    # This installs the Docker CLI inside the Jenkins container on startup
+    entrypoint: >
+      bash -c "
+      apt-get update && apt-get install -y docker.io &&
+      /usr/bin/tini -- /usr/local/bin/jenkins.sh
+      "
     restart: always
 
 volumes:
