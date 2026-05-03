@@ -89,10 +89,10 @@ def prune(type):
             "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             "user": session['user']
         })
-        flash(f"Cleanup Successful: {reclaimed_info}")
+        flash(f"Cleanup Successful: {reclaimed_info}", "success")
 
     except Exception as e:
-        flash(f"Error during {type} prune: {e}")
+        flash(f"Error during {type} prune: {e}", "error")
 
     # CRITICAL: This return was missing, causing the 500 error!
     return redirect(url_for('index'))

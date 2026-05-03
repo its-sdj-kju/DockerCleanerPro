@@ -36,15 +36,17 @@
                         <p class="text-muted">Sign in to manage infrastructure</p>
                     </div>
 
-                    {% with messages = get_flashed_messages() %}
-                      {% if messages %}
-                        {% for message in messages %}
-                          <div class="alert alert-danger py-2" role="alert" style="font-size: 0.9rem;">
-                            {{ message }}
-                          </div>
-                        {% endfor %}
-                      {% endif %}
-                    {% endwith %}
+                    {% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+    {% for category, message in messages %}
+      {% if category == 'error' %}
+        <div class="alert alert-danger py-2">
+          {{ message }}
+        </div>
+      {% endif %}
+    {% endfor %}
+  {% endif %}
+{% endwith %}
 
                     <form method="POST">
                         <div class="mb-3">
